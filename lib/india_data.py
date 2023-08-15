@@ -2,27 +2,120 @@ import pandas as pd
 from pc_transforms import pc_transforms
 
 
-def read_us_data(file_path):
-    us_df = pd.read_csv(file_path)
-    cols = [
-        'year', ## year
-        'state', ## state_name
-        'state_po', # n/a
-        'state_fips', #n/a
-        'state_cen', #n/a
-        'state_ic', #n/a
-        'office', #n/a
-        'candidate', #n/a
-        'party_detailed', # party
-        'writein',
-        'candidatevotes', # total_votes
-        'totalvotes', # delete
-        'version', # n/a
-        'notes', #n/a 
-        'party_simplified' #n/a
-        ]
-    return us_df
+def read_india_data(election_data):
+    kaggle_2019 = election_data + "/" + "kaggle/LS_2.0.csv"
+    bhavnani_2014 = election_data + "/" + "bhavnani/Bhavnani India national election dataset v 2.csv"
 
+    ls_df = read_kaggle_and_bhavnani(kaggle_2019, bhavnani_2014)
+    #calc_stats(ls_df)
+
+    print("\n******Fixing State names****\n")
+    ls_df = fix_state_names (ls_df)
+
+    #calc_stats(ls_df)
+    verify_states(ls_df)
+
+    print("\n******Fixing PC names****.....")
+    ls_df = fix_pc_names (ls_df)
+    return ls_df
+
+def read_us_data(election_data):
+
+    CUTOFF_YEAR = 1900
+    presidential_data_file_path = election_data + "/" + "mit_election_lab/US Presidential Election 1976-2020.csv"
+    electors_data_file_path = election_data + "/" + "us_president_electors/electors.csv"
+
+    # us_df = pd.read_csv(presidential_data_file_path)    
+    # cols = [
+    #     'year', ## year
+    #     'state', ## ==> state_name
+    #     'state_po', # n/a
+    #     'state_fips', #n/a
+    #     'state_cen', #n/a
+    #     'state_ic', #n/a
+    #     'office', #n/a
+    #     'candidate', #n/a
+    #     'party_detailed', # ==> party
+    #     'writein',
+    #     'candidatevotes', # ==> total_votes
+    #     'totalvotes', # delete
+    #     'version', # n/a
+    #     'notes', #n/a 
+    #     'party_simplified' #n/a
+    #     ]
+    # new_df = us_df.rename(columns={'state' : 'state_name',
+    #                                'party_simplified' : 'party',
+    #                                'totalvotes' : 'all_votes',
+    #                                'candidatevotes' : 'total_votes'
+    #                                })
+
+
+    # new_df['max_polled'] = new_df.groupby(['state_name','party','year'])['total_votes'].transform('max')    
+    # new_df['winner'] = new_df['max_polled'] == new_df['total_votes']
+
+    electors_df = pd.read_csv(electors_data_file_path)    
+    electors_df['year'] = electors_df.Year.str.split(' - ').str[0].astype(int)
+    electors_df['winner'] = electors_df.Year.str.split(' - ').str[1]
+
+    ## trim to CUTOFF_YEAR+
+    electors_df = electors_df[electors_df.year > CUTOFF_YEAR]
+
+    electors_df = electors_df.rename(columns={'total': 'total_votes',
+                                              'EV.3' : 'EV.4',
+                                              'EV.2' : 'EV.3',
+                                              'EV.1' : 'EV.2',
+                                              'EV' : 'EV.1',
+                                              'State' : 'state_name',
+                                              })
+    
+    # thurmond
+    # electors_df.loc[((electors_df.winner == "Truman") & (electors_df.Party == "Other")),"Party"] = "Democratic"
+
+    # wallace
+    #electors_df.loc[((electors_df.winner == "Nixon") & (electors_df.Party == "Other")),"Party"] = "Republican"
+
+    electors_df.loc[(electors_df.year == 1960) & (electors_df.state_name=='Mississippi'),'EV.1'] = 0
+    electors_df.loc[(electors_df.year == 1960) & (electors_df.state_name=='Mississippi'),'EV.2'] = 0
+
+    electors_df['EV.1'] = electors_df['EV.1'].str.strip("*").astype(float)
+    electors_df['EV.2'] = electors_df['EV.2'].str.strip("*").astype(float)
+    
+    electors_df.loc[electors_df['EV.1'].isna(),'EV.1'] = electors_df.loc[electors_df['EV.1'].isna(),'EV.2']
+
+    
+    #mport pdb;pdb.set_trace()    
+    #electors_df.loc[electors_df.EV.isna(),'EV'] = electors_df.loc[electors_df.EV.isna(),'EV.2']    
+
+    for party in electors_df[electors_df.year > CUTOFF_YEAR].Party.unique().tolist():
+        electors_df[party+"_ev"] = 0
+        electors_df[party+"_votes"] = 0
+
+    def map_votes_evs(row):
+        # for each row first who won
+        # greater votes and share
+        max_votes = max(row['party.1'], row['party.2'])
+        min_votes = min(row['party.1'], row['party.2'])
+        
+        if row.Party == 'Republican':
+            row["Republican_ev"] = row['EV.1']
+            row["Republican_votes"] = max_votes
+            row["Democratic_ev"] = 0
+            row["Democratic_votes"] = min_votes
+            
+        if row.Party == 'Democratic':
+            row["Democratic_ev"] = row['EV.1']
+            row["Democratic_votes"] = max_votes
+
+            row["Republican_ev"] = 0
+            row["Republican_votes"] = min_votes
+
+        return row
+    
+    new_elector_df = electors_df.apply(lambda row: map_votes_evs(row), axis=1)
+    new_elector_df['Other_votes'] = new_elector_df.total_votes - (new_elector_df.Republican_votes + new_elector_df.Democratic_votes)
+
+    elector_df_summed = new_elector_df.groupby('year').sum(['Democratic_ev','Democratic_votes','Republican_ev','Republican_votes']).reset_index()
+    return elector_df_summed
 
 def read_kaggle_and_bhavnani(kaggle_2019, bhavnani_2014):
     kaggle_2019_df = pd.read_csv(kaggle_2019)

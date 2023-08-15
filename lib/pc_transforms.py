@@ -57,7 +57,7 @@ pc_transforms = {
         'ahmadnagar':'ahmednagar',
         'bhandara - gondiya':'bhandara',
         'dhulia': 'dhule',
-    'bombay south':'mumbai south',
+        'bombay south':'mumbai south',
         'bombay north':'mumbai north',
         'mumbai north central':'mumbai north east',
         'bombay north west':'mumbai north west',

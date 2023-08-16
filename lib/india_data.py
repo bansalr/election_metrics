@@ -2,6 +2,12 @@ import pandas as pd
 from pc_transforms import pc_transforms
 
 
+import locale
+from locale import atof
+locale.setlocale(locale.LC_NUMERIC, '')
+locale.setlocale(locale.LC_NUMERIC, '')
+
+
 def read_india_data(election_data):
     kaggle_2019 = election_data + "/" + "kaggle/LS_2.0.csv"
     bhavnani_2014 = election_data + "/" + "bhavnani/Bhavnani India national election dataset v 2.csv"
@@ -24,7 +30,9 @@ def read_us_data(election_data):
     CUTOFF_YEAR = 1900
     presidential_data_file_path = election_data + "/" + "mit_election_lab/US Presidential Election 1976-2020.csv"
     electors_data_file_path = election_data + "/" + "us_president_electors/electors.csv"
+    cook_2020_data_file_path = election_data + "/" + "cook_report/us_presidential_2020.csv"
 
+    
     # us_df = pd.read_csv(presidential_data_file_path)    
     # cols = [
     #     'year', ## year
@@ -53,6 +61,20 @@ def read_us_data(election_data):
     # new_df['max_polled'] = new_df.groupby(['state_name','party','year'])['total_votes'].transform('max')    
     # new_df['winner'] = new_df['max_polled'] == new_df['total_votes']
 
+    cook_2020_df = pd.read_csv(cook_2020_data_file_path,thousands=',')
+
+    cook_2020_df['Democratic_ev'] = 0
+    cook_2020_df['Republican_ev'] = 0
+    cook_2020_df['Other_ev'] = 0    
+
+    cook_2020_df.loc[cook_2020_df.called == 'D','Democratic_ev'] = cook_2020_df.loc[cook_2020_df.called == 'D','EV']
+    cook_2020_df.loc[(cook_2020_df.called == 'R'),'Republican_ev'] = cook_2020_df.loc[cook_2020_df.called == 'R','EV']
+
+    for column in cook_2020_df[['Democratic_votes','Republican_votes','Other_votes','Democratic_ev','Republican_ev']].columns:
+        cook_2020_df[column] = cook_2020_df[column].astype(float)
+
+    
+    
     electors_df = pd.read_csv(electors_data_file_path)    
     electors_df['year'] = electors_df.Year.str.split(' - ').str[0].astype(int)
     electors_df['winner'] = electors_df.Year.str.split(' - ').str[1]
@@ -113,10 +135,16 @@ def read_us_data(election_data):
     
     new_elector_df = electors_df.apply(lambda row: map_votes_evs(row), axis=1)
     new_elector_df['Other_votes'] = new_elector_df.total_votes - (new_elector_df.Republican_votes + new_elector_df.Democratic_votes)
+    new_elector_df['Other_ev'] = 0    
+    
+    elector_df_summed = new_elector_df.groupby('year').sum().reset_index()[['Democratic_ev','Democratic_votes','Republican_ev','Republican_votes','Other_votes','Other_ev','year']]
+    cook_summed= cook_2020_df[['Democratic_votes','Republican_votes','Other_votes','Democratic_ev','Republican_ev','Other_ev']].sum()
+    cook_summed['year'] = int(2020)
+    ff = elector_df_summed._append(cook_summed.to_dict(), ignore_index=True)
 
-    elector_df_summed = new_elector_df.groupby('year').sum(['Democratic_ev','Democratic_votes','Republican_ev','Republican_votes']).reset_index()
-    return elector_df_summed
+    return ff
 
+    
 def read_kaggle_and_bhavnani(kaggle_2019, bhavnani_2014):
     kaggle_2019_df = pd.read_csv(kaggle_2019)
     bhavnani_2014_df = pd.read_csv(bhavnani_2014,index_col="linenum")

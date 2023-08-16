@@ -39,14 +39,13 @@ def calc_indices_us (data_df):
     }
     
     for election_year in election_years:
-        
         portfolio = data_df[data_df.year==election_year][['Democratic_ev', 'Republican_ev', 'Other_ev', 'Democratic_votes', 'Republican_votes','Other_votes']]
         
         measures['year'].append(election_year)
         for metric in ['total_votes','electors']:
             #import pdb;pdb.set_trace()            
-            measures[metric]['hhi'].append(myIndex.hhi(portfolio[metric_columns[metric]].values[0]))
-            measures[metric]['enp'].append(1.0/myIndex.hhi(portfolio[metric_columns[metric]].values[0]))
+            measures[metric]['hhi'].append(myIndex.hhi(portfolio[metric_columns[metric]].values[0],normalized=False))
+            measures[metric]['enp'].append(1.0/myIndex.hhi(portfolio[metric_columns[metric]].values[0],normalized=False))
             measures[metric]['shannon'].append(myIndex.shannon(portfolio[metric_columns[metric]].values[0]))
             measures[metric]['simpson'].append(myIndex.simpson(portfolio[metric_columns[metric]].values[0]))
 

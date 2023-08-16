@@ -13,29 +13,15 @@ if extra_path not in sys.path:
 
 from india_data import *
 from indices import *
-
+from plot_metrics import *
 
 ## lets load some data!!!
 
 election_data = "/Users/rbansal/src/election_metrics/data/"
+us_pres_df = read_us_data(election_data)
+india_loksabha_df = read_india_data(election_data)
 
-kaggle_2019 = election_data + "/" + "kaggle/LS_2.0.csv"
-bhavnani_2014 = election_data + "/" + "bhavnani/Bhavnani India national election dataset v 2.csv"
-
-us_presidential = election_data + "/" + "mit_election_lab/US Presidential Election 1976-2020.csv"
-us_electors = election_data + "/" + "us_president_electors/electors.csv"
-
-ls_df = read_kaggle_and_bhavnani(kaggle_2019, bhavnani_2014)
-calc_stats(ls_df)
-
-us_df = read_us_data(us_presidential, us_electors)
-us_df_summed = us_df.groupby('year').sum(['Democratic_ev','Democratic_votes','Republican_ev','Republican_votes']).reset_index()
-
-print("\n******Fixing State names****\n")
-ls_df = fix_state_names (ls_df)
-calc_stats(ls_df)
-verify_states(ls_df)
-
-print("\n******Fixing PC names****.....")
-ls_df = fix_pc_names (ls_df)
+## run the calculations
+india_outputs = calc_indices_india(india_loksabha_df)
+us_outputs = calc_indices_us(us_pres_df)
 
